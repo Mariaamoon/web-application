@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as starletteHTTPpexception
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from schemas import postcreate, postresponse
 
 
 app = FastAPI()
@@ -51,12 +52,28 @@ def post_page(request: Request, post_id: int):
     )
 
 
-@app.get("/api/posts")
+@app.get("/api/posts", response_model=list[postresponse])
 def get_posts():
     return posts
 
 
-@app.get("/api/posts/{post_id}")
+@app.post(
+    "/api/posts", response_model=postresponse, status_code=status.HTTP_201_CREATED
+)
+def create_post(post: postcreate):
+    new_id = max(p["id"] for p in posts) + 1 if posts else 1
+    new_post = {
+        "id": new_id,
+        "author": post.author,
+        "title": post.title,
+        "content": post.content,
+        "date_posted": "april 20 2025",
+    }
+    posts.append(new_post)
+    return new_post
+
+
+@app.get("/api/posts/{post_id}", response_model=postresponse)
 def get_post(post_id: int):
     for post in posts:
         if post.get("id") == post_id:
@@ -70,7 +87,7 @@ def get_post(post_id: int):
 def general_http_exception_handler(
     request: Request, exception: starletteHTTPpexception
 ):
-    message =( exception.detail if exception.detail else "an error accured")
+    message = exception.detail if exception.detail else "an error accured"
     if request.url.path.startswith("/api"):
         return JSONResponse(
             status_code=exception.status_code,
@@ -86,10 +103,10 @@ def general_http_exception_handler(
         },
         status_code=exception.status_code,
     )
+
+
 @app.exception_handler(RequestValidationError)
-def validation_exception_handler(
-    request: Request, exception: RequestValidationError
-):
+def validation_exception_handler(request: Request, exception: RequestValidationError):
     if request.url.path.startswith("/api"):
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
